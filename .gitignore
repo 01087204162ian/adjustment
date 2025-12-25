@@ -137,6 +137,7 @@ Thumbs.db
 *.crdownload
 *.tmp
 *.bak
+*.xlsx
 driving_data*
 *driving_data*
 
