@@ -74,6 +74,9 @@ pyinstaller settle_baemin.py ^
 
 ## 방법 2: Streamlit 앱 (app.py) 변환
 
+**⚠️ 주의**: Streamlit 앱을 exe로 변환하는 것은 복잡하고 제한적입니다. 
+대신 **배치 파일 방식(`run_streamlit_app.bat`)**을 사용하는 것을 권장합니다.
+
 Streamlit 앱은 웹 서버이므로 일반 exe와는 다르게 처리해야 합니다.
 
 ### 방법 2-1: 래퍼 스크립트 사용 (권장)
@@ -111,7 +114,10 @@ pyinstaller run_streamlit_app.py ^
     --hidden-import numpy
 ```
 
-**주의사항:** 이 방법은 Streamlit과 모든 의존성을 포함해야 하므로 파일 크기가 매우 큽니다 (100MB 이상).
+**주의사항:** 
+- 이 방법은 Streamlit과 모든 의존성을 포함해야 하므로 파일 크기가 매우 큽니다 (200MB 이상)
+- exe 환경에서 Streamlit이 제대로 작동하지 않을 수 있습니다
+- **권장**: 대신 `run_streamlit_app.bat` 배치 파일을 사용하세요
 
 ### 방법 2-2: 배치 파일로 실행 (간단한 방법)
 

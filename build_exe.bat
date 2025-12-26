@@ -36,9 +36,38 @@ if errorlevel 1 (
 REM 기존 빌드 파일 정리
 echo.
 echo [3/5] 기존 빌드 파일 정리 중...
-if exist "build" rmdir /s /q "build"
-if exist "dist" rmdir /s /q "dist"
-if exist "*.spec" del /q "*.spec"
+
+REM 실행 중인 exe 프로세스 종료 시도
+echo 실행 중인 프로세스 확인 중...
+taskkill /F /IM "배민정산계산기_CLI.exe" >nul 2>&1
+taskkill /F /IM "배민정산계산기_웹.exe" >nul 2>&1
+timeout /t 1 /nobreak >nul
+
+REM 빌드 폴더 삭제
+if exist "build" (
+    echo build 폴더 삭제 중...
+    rmdir /s /q "build" 2>nul
+)
+
+REM dist 폴더의 파일 삭제 (더 강력한 방법)
+if exist "dist" (
+    echo dist 폴더 정리 중...
+    REM dist 폴더 내의 모든 파일 삭제 시도
+    del /f /q "dist\*.*" >nul 2>&1
+    REM 잠시 대기 후 폴더 삭제
+    timeout /t 1 /nobreak >nul
+    rmdir /s /q "dist" 2>nul
+    REM 폴더가 여전히 있으면 다시 시도
+    if exist "dist" (
+        echo 경고: dist 폴더를 완전히 삭제할 수 없습니다.
+        echo 실행 중인 파일이 있을 수 있습니다. 수동으로 확인해주세요.
+        echo.
+        pause
+    )
+)
+
+REM spec 파일 삭제 (선택사항 - 기존 spec 파일 유지하려면 주석 처리)
+REM if exist "*.spec" del /q "*.spec"
 
 REM CLI 버전 빌드
 echo.
@@ -68,21 +97,30 @@ echo.
 echo [5/5] Streamlit 웹 버전 빌드 중...
 echo (이 작업은 시간이 오래 걸릴 수 있습니다...)
 
-pyinstaller app_streamlit_wrapper.py ^
-    --name "배민정산계산기_웹" ^
-    --onefile ^
-    --clean ^
-    --noconfirm ^
-    --console ^
-    --add-data "app.py;." ^
-    --add-data "settle_baemin.py;." ^
-    --hidden-import streamlit ^
-    --hidden-import pandas ^
-    --hidden-import openpyxl ^
-    --hidden-import numpy ^
-    --hidden-import altair ^
-    --hidden-import pydeck ^
-    --collect-all streamlit
+REM spec 파일이 있으면 사용, 없으면 직접 빌드
+if exist "배민정산계산기_웹.spec" (
+    echo spec 파일을 사용하여 빌드합니다...
+    pyinstaller 배민정산계산기_웹.spec ^
+        --clean ^
+        --noconfirm
+) else (
+    echo 직접 빌드합니다...
+    pyinstaller app_streamlit_wrapper.py ^
+        --name "배민정산계산기_웹" ^
+        --onefile ^
+        --clean ^
+        --noconfirm ^
+        --console ^
+        --add-data "app.py;." ^
+        --add-data "settle_baemin.py;." ^
+        --hidden-import streamlit ^
+        --hidden-import pandas ^
+        --hidden-import openpyxl ^
+        --hidden-import numpy ^
+        --hidden-import altair ^
+        --hidden-import pydeck ^
+        --collect-all streamlit
+)
 
 if errorlevel 1 (
     echo.
