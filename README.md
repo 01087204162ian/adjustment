@@ -34,7 +34,8 @@
 
 ```
 adjustment/
-├── settle_saryun.py          # 메인 처리 스크립트
+├── settle_saryun.py          # 메인 처리 스크립트 (CLI)
+├── app.py                    # Streamlit 웹 애플리케이션
 ├── requirements.txt          # Python 패키지 의존성
 ├── README.md                # 이 파일
 └── docs/                    # 문서 폴더
@@ -43,7 +44,7 @@ adjustment/
 
 ## 사용법
 
-### CLI 스크립트 사용
+### 1. CLI 스크립트 사용
 
 ```bash
 python settle_saryun.py <입력파일.xlsx> --out <출력파일.xlsx>
@@ -54,12 +55,28 @@ python settle_saryun.py <입력파일.xlsx> --out <출력파일.xlsx>
 python settle_saryun.py driving_data_20251101_20251130.xlsx --out DB_사륜_251031_251130.xlsx
 ```
 
+### 2. Streamlit 웹 앱 사용 (권장)
+
+```bash
+streamlit run app.py
+```
+
+브라우저에서 자동으로 열리며, 웹 인터페이스를 통해 파일을 업로드하고 처리할 수 있습니다.
+
+**주요 기능:**
+- 파일 업로드 및 처리
+- 결과 미리보기 (전체 데이터, 통계, 요약)
+- Excel 파일 다운로드
+- 실시간 진행 상황 표시
+
+**상세 사용법**: [`docs/app_사용법.md`](docs/app_사용법.md) 참조
+
 ## 입력 파일 형식
 
 **필수 컬럼:**
 - 보험사 운행 ID
 - 플랫폼 운행 ID
-- 기사아이디
+- 기사이이디
 - 시작시간 / 종료시간
 - 담보
 - 보험사기준영업일
@@ -97,6 +114,7 @@ python settle_saryun.py driving_data_20251101_20251130.xlsx --out DB_사륜_2510
 - `pandas>=1.5.0,<2.0.0`
 - `openpyxl>=3.1.0`
 - `numpy>=1.21.0,<1.22.0`
+- `streamlit>=1.28.0`
 
 설치 방법:
 ```bash
@@ -105,7 +123,8 @@ pip install -r requirements.txt
 
 ## 상세 문서
 
-자세한 시나리오 및 처리 흐름은 [`docs/사륜_정산_시나리오.md`](docs/사륜_정산_시나리오.md)를 참조하세요.
+- [`docs/사륜_정산_시나리오.md`](docs/사륜_정산_시나리오.md) - 간략한 시나리오 문서
+- [`docs/사륜_정산_프로세스_시나리오.md`](docs/사륜_정산_프로세스_시나리오.md) - 완전판 프로세스 시나리오 (상세)
 
 ## 주의사항
 

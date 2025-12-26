@@ -46,7 +46,7 @@ SELF_CAR_KEYWORDS = ["자차", "자기부담금", "자기부담"]
 REQUIRED_COLS = [
     "보험사 운행 ID",
     "플랫폼 운행 ID",
-    "기사아이디",
+    "기사이이디",  # 입력 파일의 실제 컬럼명
     "시작시간",
     "종료시간",
     "담보",
@@ -127,7 +127,7 @@ def calc_overlap_minutes(
     
     Args:
         df: 데이터프레임
-        group_cols: 그룹화 컬럼 (예: ['기사아이디', '영업일'])
+        group_cols: 그룹화 컬럼 (예: ['기사이이디', '영업일'])
         include_self_car: 자차 포함 여부
     
     Returns:
@@ -270,7 +270,9 @@ def process(input_xlsx: str, output_xlsx: str) -> None:
     
     # Step 5: 중복 운행 시간 계산
     print("Step 5: 중복 운행 시간 계산 중...")
-    group_cols = ["기사아이디", "배민기준영업일_calc"]
+    # 입력 파일의 컬럼명에 맞춰 사용 (기사이이디)
+    driver_col = "기사이이디" if "기사이이디" in df.columns else "기사아이디"
+    group_cols = [driver_col, "배민기준영업일_calc"]
     
     # 자차 포함 중복 시간
     df["중복운행(분)_자차포함"] = calc_overlap_minutes(
@@ -376,13 +378,53 @@ def process(input_xlsx: str, output_xlsx: str) -> None:
     final_cols = [col for col in final_cols if col in df_result.columns]
     df_result = df_result[final_cols]
     
-    # 결과 저장
+    # Step 11: 일자별 집계 테이블 생성 (P~U)
+    print("Step 11: 일자별 집계 테이블 생성 중...")
+    
+    # 운행일 기준으로 집계
+    daily_summary = []
+    
+    # 운행일별로 그룹화
+    for 운행일, group_df in df_result.groupby("운행일", sort=True):
+        # 자차 포함 집계
+        운행분_자차포함 = group_df["운행(분)_자차포함"].sum()
+        중복운행분_자차포함 = group_df["중복운행(분)_자차포함"].sum()
+        
+        # 자차 미포함 집계
+        운행분_자차미포함 = group_df["운행(분)_자차미포함"].sum()
+        중복운행분_자차미포함 = group_df["중복운행(분)_자차미포함"].sum()
+        
+        daily_summary.append({
+            "운행일": 운행일,
+            "운행(분)_자차 포함": int(운행분_자차포함),
+            "운행(분)_자차 미포함": int(운행분_자차미포함),
+            "중복운행(분)_자차포함": int(중복운행분_자차포함),
+            "중복운행(분)_자차미포함": int(중복운행분_자차미포함),
+        })
+    
+    df_daily = pd.DataFrame(daily_summary)
+    
+    # 결과 저장 (같은 시트에 2개 테이블: A~N 운행건단위, P~U 일자별집계)
     print(f"결과 파일 저장 중: {output_xlsx}")
-    df_result.to_excel(output_xlsx, index=False, engine="openpyxl")
+    with pd.ExcelWriter(output_xlsx, engine="openpyxl") as writer:
+        # 시트 1: 운행(건) 단위 테이블 (A~N)
+        df_result.to_excel(writer, index=False, sheet_name="DB_사륜_정산결과")
+        
+        # 같은 시트에 일자별 집계 테이블 추가 (P~U, startcol=15는 P열)
+        if not df_daily.empty:
+            # 헤더 행은 0번째 행 (df_result의 헤더와 같은 행)
+            df_daily.to_excel(
+                writer, 
+                index=False, 
+                sheet_name="DB_사륜_정산결과",
+                startrow=0, 
+                startcol=15  # P열부터 시작 (A=0, B=1, ..., P=15)
+            )
     
     print("처리 완료!")
     print(f"총 {len(df_result):,}건 처리")
     print(f"총 보험료: {df_result['보험료'].sum():,}원")
+    print(f"일자별 집계: {len(df_daily)}일")
 
 
 def main() -> None:
