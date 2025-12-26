@@ -34,14 +34,21 @@ Excel 파일을 입력받아 운행 시간을 계산하고, 중복 시간을 제
 
 ```
 adjustment/
-├── settle_baemin.py      # 메인 처리 스크립트 (CLI)
-├── app.py                # Streamlit 웹 애플리케이션
-├── verify_output.py      # 출력 파일 검증 스크립트
-├── requirements.txt      # Python 패키지 의존성
-├── checklist.md          # 요구사항 체크리스트
-├── .gitignore           # Git 무시 파일 목록
-└── docs/                # 문서 폴더
-    └── README.md        # 이 파일
+├── settle_baemin.py          # 메인 처리 스크립트 (CLI)
+├── app.py                    # Streamlit 웹 애플리케이션
+├── app_streamlit_wrapper.py  # Streamlit 앱 exe 변환용 래퍼
+├── verify_output.py          # 출력 파일 검증 스크립트
+├── build_exe.bat             # EXE 빌드 스크립트
+├── requirements.txt          # Python 패키지 의존성
+├── checklist.md              # 요구사항 체크리스트
+├── *.spec                    # PyInstaller 설정 파일
+├── .gitignore                # Git 무시 파일 목록
+└── docs/                     # 문서 폴더
+    ├── README.md            # 이 파일
+    ├── 사용법.md            # 상세 사용 가이드
+    ├── 개발이력.md          # 개발 이력
+    ├── 향후작업.md          # 향후 작업 계획
+    └── exe변환가이드.md     # EXE 변환 가이드
 ```
 
 ## 사용법
@@ -71,6 +78,25 @@ streamlit run app.py
 
 ```bash
 python verify_output.py <출력파일.xlsx>
+```
+
+### 4. EXE 파일로 변환
+
+Python이 설치되지 않은 환경에서도 사용할 수 있도록 실행 파일(.exe)로 변환할 수 있습니다.
+
+자세한 내용은 [`docs/exe변환가이드.md`](exe변환가이드.md)를 참조하세요.
+
+**빠른 시작:**
+
+```bash
+# 1. PyInstaller 설치
+pip install pyinstaller
+
+# 2. 빌드 스크립트 실행
+build_exe.bat
+
+# 또는 직접 빌드
+pyinstaller settle_baemin.py --name "배민정산계산기" --onefile
 ```
 
 ## 정산 기준
@@ -177,6 +203,24 @@ pip install -r requirements.txt
 - 파일이 손상되었거나 다운로드가 완료되지 않은 경우
 - `.crdownload` 파일은 사용할 수 없습니다
 
+## EXE 변환
+
+Python이 설치되지 않은 Windows 환경에서도 사용할 수 있도록 실행 파일(.exe)로 변환할 수 있습니다.
+
+**빌드 방법:**
+
+```bash
+# 자동 빌드 스크립트 사용
+build_exe.bat
+
+# 또는 수동 빌드
+pyinstaller settle_baemin.py --name "배민정산계산기" --onefile
+```
+
+생성된 exe 파일은 `dist` 폴더에 저장됩니다.
+
+자세한 내용은 [`docs/exe변환가이드.md`](exe변환가이드.md)를 참조하세요.
+
 ## 개발 이력
 
 - **2025-12-26**: 초기 버전 작성
@@ -184,6 +228,7 @@ pip install -r requirements.txt
   - Streamlit 웹 앱 (`app.py`) 구현
   - 출력 검증 스크립트 (`verify_output.py`) 구현
   - 요구사항 체크리스트 작성
+  - EXE 변환 가이드 및 빌드 스크립트 추가
 
 ## 라이선스
 
