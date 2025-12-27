@@ -30,14 +30,10 @@ from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 
-# 담보별 분당 보험료 (원/분)
-RATES = {
-    "대인1": 3.28,
-    "대인1지원": 3.28,
-    "대인2": 4.34,
-    "대물": 3.68,
-    "자차": 0.0,  # 자차는 보험료 없음
-}
+# 분당 단가 (원/분) - README.md 기준
+# 단일 단가 체계 (자차 포함/미포함 구분)
+RATE_WITH_SELF_CAR = 11.6   # 자차 포함: 11.6원/분
+RATE_WITHOUT_SELF_CAR = 9.02  # 자차 미포함: 9.02원/분
 
 # 자차 담보명 (다양한 표현 가능)
 SELF_CAR_KEYWORDS = ["자차", "자기부담금", "자기부담"]
@@ -173,21 +169,20 @@ def calc_overlap_minutes(
     return result
 
 
-def calc_premium(running_minutes: pd.Series, coverage: pd.Series) -> pd.Series:
+def calc_premium(running_minutes: pd.Series, is_self_car: pd.Series) -> pd.Series:
     """
-    보험료 계산 (담보별 원단위 절사 후 합산)
+    보험료 계산 (단일 분당 단가 체계)
     
-    중요: 각 담보별로 원단위 절사 후 합산
+    README.md 9.1 기준:
+    - 자차 포함: 11.6원/분
+    - 자차 미포함: 9.02원/분
+    
+    참고: 최종 보험료는 일자별 집계 단계에서 정산 인정 운행시간(분) 기준으로 재계산됨
     """
-    premium = pd.Series(0.0, index=running_minutes.index)
-    
-    for cov, rate in RATES.items():
-        mask = coverage.str.contains(cov, na=False, case=False)
-        if mask.any():
-            # 분당 요율 × 운행시간(분) → 원단위 절사
-            cov_premium = np.floor(running_minutes[mask] * rate).astype(int)
-            premium.loc[mask] += cov_premium
-    
+    # 자차 포함/미포함에 따라 단가 적용
+    rate = np.where(is_self_car, RATE_WITH_SELF_CAR, RATE_WITHOUT_SELF_CAR)
+    # 보험료 = 운행시간(분) × 분당 단가
+    premium = running_minutes * rate
     return premium.astype(int)
 
 
@@ -256,7 +251,7 @@ def process(input_xlsx: str, output_xlsx: str) -> None:
     dur_sec = (df["종료시간"] - df["시작시간"]).dt.total_seconds()
     df["운행시간"] = np.where(
         dur_sec.notna() & (dur_sec >= 0),
-        np.floor(dur_sec / 60.0).astype(int),  # 분 단위 절사
+        np.ceil(dur_sec / 60.0).astype(int),  # 분 단위 올림 처리 (README.md 4.2)
         0
     )
     
@@ -271,8 +266,9 @@ def process(input_xlsx: str, output_xlsx: str) -> None:
     # Step 5: 중복 운행 시간 계산
     print("Step 5: 중복 운행 시간 계산 중...")
     # 입력 파일의 컬럼명에 맞춰 사용 (기사이이디)
+    # 집계 기준: 보험사 기사아이디 + 보험사 기준영업일 (README.md 6)
     driver_col = "기사이이디" if "기사이이디" in df.columns else "기사아이디"
-    group_cols = [driver_col, "배민기준영업일_calc"]
+    group_cols = [driver_col, "보험사기준영업일"]  # 보험사 기준영업일 사용 (README.md 6)
     
     # 자차 포함 중복 시간
     df["중복운행(분)_자차포함"] = calc_overlap_minutes(
@@ -295,7 +291,8 @@ def process(input_xlsx: str, output_xlsx: str) -> None:
     
     # Step 7: 보험료 산출
     print("Step 7: 보험료 산출 중...")
-    df["보험료"] = calc_premium(df["운행시간"], df["담보"])
+    # 주의: 최종 보험료는 일자별 집계 단계에서 정산 인정 운행시간 기준으로 재계산됨
+    df["보험료"] = calc_premium(df["운행시간"], df["is_self_car"])
     
     # 원본 컬럼이 있으면 업데이트
     if "총 보험료" in df.columns:
@@ -384,22 +381,26 @@ def process(input_xlsx: str, output_xlsx: str) -> None:
     # 운행일 기준으로 집계
     daily_summary = []
     
-    # 운행일별로 그룹화
+    # 운행일별로 그룹화 (README.md 8.1 기준)
     for 운행일, group_df in df_result.groupby("운행일", sort=True):
         # 자차 포함 집계
         운행분_자차포함 = group_df["운행(분)_자차포함"].sum()
         중복운행분_자차포함 = group_df["중복운행(분)_자차포함"].sum()
+        정산운행분_자차포함 = 운행분_자차포함 - 중복운행분_자차포함  # README.md 7.4
         
         # 자차 미포함 집계
         운행분_자차미포함 = group_df["운행(분)_자차미포함"].sum()
         중복운행분_자차미포함 = group_df["중복운행(분)_자차미포함"].sum()
+        정산운행분_자차미포함 = 운행분_자차미포함 - 중복운행분_자차미포함  # README.md 7.4
         
         daily_summary.append({
             "운행일": 운행일,
-            "운행(분)_자차 포함": int(운행분_자차포함),
-            "운행(분)_자차 미포함": int(운행분_자차미포함),
+            "운행(분)_자차포함": int(운행분_자차포함),
+            "운행(분)_자차미포함": int(운행분_자차미포함),
             "중복운행(분)_자차포함": int(중복운행분_자차포함),
             "중복운행(분)_자차미포함": int(중복운행분_자차미포함),
+            "정산 운행(분)_자차포함": int(정산운행분_자차포함),  # README.md 8.1
+            "정산 운행(분)_자차미포함": int(정산운행분_자차미포함),  # README.md 8.1
         })
     
     df_daily = pd.DataFrame(daily_summary)

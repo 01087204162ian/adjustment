@@ -14,7 +14,8 @@ import streamlit as st
 # settle_saryun.py의 함수들을 import
 try:
     from settle_saryun import (
-        RATES,
+        RATE_WITH_SELF_CAR,
+        RATE_WITHOUT_SELF_CAR,
         SELF_CAR_KEYWORDS,
         REQUIRED_COLS,
         to_kst_naive,
@@ -81,7 +82,7 @@ def process_data(df: pd.DataFrame) -> tuple:
     dur_sec = (df["종료시간"] - df["시작시간"]).dt.total_seconds()
     df["운행시간"] = np.where(
         dur_sec.notna() & (dur_sec >= 0),
-        np.floor(dur_sec / 60.0).astype(int),  # 분 단위 절사
+        np.ceil(dur_sec / 60.0).astype(int),  # 분 단위 올림 처리 (README.md 4.2)
         0
     )
     
@@ -94,8 +95,9 @@ def process_data(df: pd.DataFrame) -> tuple:
     
     # Step 5: 중복 운행 시간 계산
     # 입력 파일의 컬럼명에 맞춰 사용 (기사이이디)
+    # 집계 기준: 보험사 기사아이디 + 보험사 기준영업일 (README.md 6)
     driver_col = "기사이이디" if "기사이이디" in df.columns else "기사아이디"
-    group_cols = [driver_col, "배민기준영업일_calc"]
+    group_cols = [driver_col, "보험사기준영업일"]  # 보험사 기준영업일 사용 (README.md 6)
     
     # 자차 포함 중복 시간
     df["중복운행(분)_자차포함"] = calc_overlap_minutes(
@@ -116,7 +118,8 @@ def process_data(df: pd.DataFrame) -> tuple:
     )
     
     # Step 7: 보험료 산출
-    df["보험료"] = calc_premium(df["운행시간"], df["담보"])
+    # 주의: 최종 보험료는 일자별 집계 단계에서 정산 인정 운행시간 기준으로 재계산됨
+    df["보험료"] = calc_premium(df["운행시간"], df["is_self_car"])
     
     # 원본 컬럼이 있으면 업데이트
     if "총 보험료" in df.columns:
@@ -196,22 +199,26 @@ def process_data(df: pd.DataFrame) -> tuple:
     # 일자별 집계 테이블 생성 (P~U)
     daily_summary = []
     
-    # 운행일별로 그룹화
+    # 운행일별로 그룹화 (README.md 8.1 기준)
     for 운행일, group_df in df_result.groupby("운행일", sort=True):
         # 자차 포함 집계
         운행분_자차포함 = group_df["운행(분)_자차포함"].sum()
         중복운행분_자차포함 = group_df["중복운행(분)_자차포함"].sum()
+        정산운행분_자차포함 = 운행분_자차포함 - 중복운행분_자차포함  # README.md 7.4
         
         # 자차 미포함 집계
         운행분_자차미포함 = group_df["운행(분)_자차미포함"].sum()
         중복운행분_자차미포함 = group_df["중복운행(분)_자차미포함"].sum()
+        정산운행분_자차미포함 = 운행분_자차미포함 - 중복운행분_자차미포함  # README.md 7.4
         
         daily_summary.append({
             "운행일": 운행일,
-            "운행(분)_자차 포함": int(운행분_자차포함),
-            "운행(분)_자차 미포함": int(운행분_자차미포함),
+            "운행(분)_자차포함": int(운행분_자차포함),
+            "운행(분)_자차미포함": int(운행분_자차미포함),
             "중복운행(분)_자차포함": int(중복운행분_자차포함),
             "중복운행(분)_자차미포함": int(중복운행분_자차미포함),
+            "정산 운행(분)_자차포함": int(정산운행분_자차포함),  # README.md 8.1
+            "정산 운행(분)_자차미포함": int(정산운행분_자차미포함),  # README.md 8.1
         })
     
     df_daily = pd.DataFrame(daily_summary)
